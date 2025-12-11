@@ -1,0 +1,1833 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crystal Defenders Quiz</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .game-container {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100%;
+      overflow: auto;
+    }
+    
+    canvas {
+      border: 4px solid #4a5568;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      cursor: crosshair;
+    }
+    
+    .tower-btn {
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+    
+    .tower-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    .tower-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .tower-btn.selected {
+      border-color: #fbbf24;
+      box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+    }
+    
+    .stat-card {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px);
+      transition: transform 0.2s;
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .quiz-option {
+      transition: all 0.3s;
+    }
+    
+    .quiz-option:hover:not(.correct):not(.incorrect) {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .quiz-option.correct {
+      background: #10b981 !important;
+      color: white;
+      border-color: #059669;
+    }
+    
+    .quiz-option.incorrect {
+      background: #ef4444 !important;
+      color: white;
+      border-color: #dc2626;
+    }
+    
+    .modal-backdrop {
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+    }
+    
+    .slide-up {
+      animation: slideUp 0.3s ease-out;
+    }
+    
+    @keyframes slideUp {
+      from {
+        transform: translateY(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    .tab-btn.active {
+      background: #8b5cf6;
+      color: white;
+    }
+    
+    .tab-btn:not(.active) {
+      background: #e5e7eb;
+      color: #4b5563;
+    }
+
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      color: white;
+      font-weight: 600;
+      z-index: 1000;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .notification.success {
+      background: #10b981;
+    }
+
+    .notification.error {
+      background: #ef4444;
+    }
+    
+    .sound-toggle {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.9);
+      border: 2px solid #8b5cf6;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 24px;
+      transition: all 0.3s;
+      z-index: 100;
+    }
+    
+    .sound-toggle:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/element_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full"><!-- Sound Toggle Button --> <button id="soundToggle" class="sound-toggle" title="Toggle Sound">🔊</button>
+  <div id="app" class="game-container h-full w-full"><!-- Main Menu -->
+   <div id="mainMenu" class="flex flex-col items-center justify-center min-h-full p-8">
+    <div class="text-center mb-8">
+     <h1 id="gameTitle" class="text-6xl font-bold text-white mb-4 drop-shadow-lg">Crystal Defenders Quiz</h1>
+     <p id="welcomeMessage" class="text-xl text-purple-100 max-w-2xl">Defend your crystal by answering quiz questions!</p>
+    </div>
+    <div class="flex flex-col gap-4 w-80"><button id="startGameBtn" class="bg-gradient-to-r from-purple-400 to-pink-500 text-white px-8 py-4 rounded-lg text-xl font-bold hover:from-purple-500 hover:to-pink-600 transform hover:scale-105 transition shadow-lg"> 🎮 Start Game </button> <button id="adminBtn" class="bg-gradient-to-r from-indigo-400 to-blue-500 text-white px-8 py-4 rounded-lg text-xl font-bold hover:from-indigo-500 hover:to-blue-600 transform hover:scale-105 transition shadow-lg"> Question Manager </button> <button id="statsBtn" class="bg-gradient-to-r from-green-400 to-emerald-500 text-white px-8 py-4 rounded-lg text-xl font-bold hover:from-green-500 hover:to-emerald-600 transform hover:scale-105 transition shadow-lg"> View Stats </button> <button id="loadBtn" class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-8 py-4 rounded-lg text-xl font-bold hover:from-yellow-500 hover:to-orange-600 transform hover:scale-105 transition shadow-lg"> Load Game </button>
+    </div>
+    <div class="mt-8 text-white text-center max-w-2xl">
+     <h3 class="text-2xl font-bold mb-4">How to Play</h3>
+     <div class="bg-white bg-opacity-20 p-6 rounded-lg backdrop-blur-sm">
+      <div class="text-left space-y-2">
+       <p>📚 <strong>Answer Quiz Questions</strong> to earn gold</p>
+       <p>🏰 <strong>Build Towers</strong> to defend against enemies</p>
+       <p>🌊 <strong>Survive 20 Waves</strong> to win the game</p>
+       <p>💰 <strong>Earn Gold</strong> by answering correctly and defeating enemies</p>
+       <p>❤️ <strong>Protect Your Lives</strong> - don't let enemies reach the end!</p>
+      </div>
+     </div>
+    </div>
+   </div><!-- Admin Panel -->
+   <div id="adminPanel" class="hidden min-h-full p-8">
+    <div class="max-w-6xl mx-auto">
+     <div class="bg-white rounded-lg shadow-2xl p-8">
+      <div class="flex justify-between items-center mb-8">
+       <h2 class="text-4xl font-bold text-purple-600">Question Manager</h2><button id="backFromAdminBtn" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition"> Back to Menu </button>
+      </div><!-- Tab Navigation -->
+      <div class="flex gap-2 mb-6"><button id="singleTabBtn" class="tab-btn active flex-1 px-6 py-3 rounded-lg font-semibold transition"> ➕ Single Question </button> <button id="bulkTabBtn" class="tab-btn flex-1 px-6 py-3 rounded-lg font-semibold transition"> 📋 Bulk Import </button>
+      </div><!-- Single Question Panel -->
+      <div id="singleQuestionPanel" class="bg-purple-50 rounded-lg p-6 mb-8">
+       <h3 class="text-2xl font-bold text-gray-800 mb-4">Add New Question</h3>
+       <form id="addQuestionForm" class="space-y-4">
+        <div><label class="block text-sm font-semibold text-gray-700 mb-2">Question Text</label> <textarea id="questionText" class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:outline-none" rows="3" required placeholder="Enter your question here..."></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+         <div><label class="block text-sm font-semibold text-gray-700 mb-2">Option A</label> <input type="text" id="optionA" class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:outline-none" required placeholder="Option A">
+         </div>
+         <div><label class="block text-sm font-semibold text-gray-700 mb-2">Option B</label> <input type="text" id="optionB" class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:outline-none" required placeholder="Option B">
+         </div>
+         <div><label class="block text-sm font-semibold text-gray-700 mb-2">Option C</label> <input type="text" id="optionC" class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:outline-none" required placeholder="Option C">
+         </div>
+         <div><label class="block text-sm font-semibold text-gray-700 mb-2">Option D</label> <input type="text" id="optionD" class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:outline-none" required placeholder="Option D">
+         </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+         <div><label class="block text-sm font-semibold text-gray-700 mb-2">Correct Answer</label> <select id="correctAnswer" class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:outline-none" required> <option value="">Select...</option> <option value="A">A</option> <option value="B">B</option> <option value="C">C</option> <option value="D">D</option> </select>
+         </div>
+         <div><label class="block text-sm font-semibold text-gray-700 mb-2">Difficulty</label> <select id="difficulty" class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:outline-none" required> <option value="easy">Easy (50 Gold)</option> <option value="medium">Medium (100 Gold)</option> <option value="hard">Hard (200 Gold)</option> </select>
+         </div>
+         <div><label class="block text-sm font-semibold text-gray-700 mb-2">Category</label> <input type="text" id="category" class="w-full border-2 border-gray-300 rounded-lg p-3 focus:border-purple-500 focus:outline-none" required placeholder="e.g., Math, Science">
+         </div>
+        </div><button type="submit" id="submitQuestionBtn" class="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 rounded-lg font-bold hover:from-purple-600 hover:to-pink-700 transition shadow-lg"> Add Question </button>
+       </form>
+      </div><!-- Bulk Import Panel -->
+      <div id="bulkImportPanel" class="hidden bg-blue-50 rounded-lg p-6 mb-8">
+       <h3 class="text-2xl font-bold text-gray-800 mb-4">📋 Bulk Import Questions</h3>
+       <div class="bg-white border-2 border-blue-300 rounded-lg p-4 mb-4">
+        <h4 class="font-bold text-gray-800 mb-2">📖 Format Instruksi:</h4>
+        <div class="text-sm text-gray-700 space-y-2">
+         <p>Gunakan format berikut (gunakan tanda * untuk jawaban yang benar):</p>
+         <pre class="bg-gray-100 p-3 rounded text-xs overflow-x-auto">Q: Berapa hasil 2+2?
+A: 3
+B: 4*
+C: 5
+D: 6
+Category: Matematika
+Difficulty: easy
+
+Q: Apa ibu kota Indonesia?
+A: Bandung
+B: Surabaya
+C: Jakarta*
+D: Medan
+Category: Geografi
+Difficulty: medium</pre>
+         <p class="text-xs text-gray-600"><strong>Catatan:</strong> Pisahkan setiap soal dengan baris kosong. Difficulty: easy/medium/hard</p>
+        </div>
+       </div>
+       <form id="bulkImportForm">
+        <div class="mb-4"><label class="block text-sm font-semibold text-gray-700 mb-2">Paste Soal-soal Anda (Copy dari .docx)</label> <textarea id="bulkTextArea" class="w-full border-2 border-gray-300 rounded-lg p-4 focus:border-blue-500 focus:outline-none font-mono text-sm" rows="15" placeholder="Paste soal-soal di sini menggunakan format di atas..."></textarea>
+        </div>
+        <div id="bulkPreview" class="hidden mb-4 bg-white border-2 border-green-300 rounded-lg p-4">
+         <h4 class="font-bold text-green-700 mb-2">✅ Preview Soal yang Akan Ditambahkan:</h4>
+         <div id="bulkPreviewContent" class="text-sm text-gray-700 max-h-60 overflow-y-auto"></div>
+        </div>
+        <div id="bulkError" class="hidden mb-4 bg-red-50 border-2 border-red-300 rounded-lg p-4">
+         <h4 class="font-bold text-red-700 mb-2">⚠️ Error dalam Format:</h4>
+         <div id="bulkErrorContent" class="text-sm text-red-600"></div>
+        </div>
+        <div class="flex gap-3"><button type="button" id="previewBulkBtn" class="flex-1 bg-blue-500 text-white py-3 rounded-lg font-bold hover:bg-blue-600 transition shadow-lg"> 👁️ Preview </button> <button type="submit" id="submitBulkBtn" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-bold hover:from-green-600 hover:to-emerald-700 transition shadow-lg" disabled> ✅ Import All Questions </button>
+        </div>
+       </form>
+      </div><!-- Questions List -->
+      <div>
+       <div class="flex justify-between items-center mb-4">
+        <h3 class="text-2xl font-bold text-gray-800">Existing Questions (<span id="questionCount">0</span>)</h3><button id="deleteAllQuestionsBtn" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"> ����️ Delete All Questions </button>
+       </div>
+       <div id="questionsList" class="space-y-4"><!-- Questions will be listed here -->
+       </div>
+      </div>
+     </div>
+    </div>
+   </div><!-- Game Screen -->
+   <div id="gameScreen" class="hidden min-h-full p-4">
+    <div class="max-w-7xl mx-auto"><!-- Header Stats -->
+     <div class="grid grid-cols-4 gap-4 mb-4">
+      <div class="stat-card rounded-lg p-4 text-center">
+       <p class="text-sm text-gray-600 font-semibold">Wave</p>
+       <p id="waveDisplay" class="text-3xl font-bold text-purple-600">1/20</p>
+      </div>
+      <div class="stat-card rounded-lg p-4 text-center">
+       <p class="text-sm text-gray-600 font-semibold">Gold</p>
+       <p id="goldDisplay" class="text-3xl font-bold text-yellow-600">100</p>
+      </div>
+      <div class="stat-card rounded-lg p-4 text-center">
+       <p class="text-sm text-gray-600 font-semibold">Lives</p>
+       <p id="livesDisplay" class="text-3xl font-bold text-red-600">20</p>
+      </div>
+      <div class="stat-card rounded-lg p-4 text-center">
+       <p class="text-sm text-gray-600 font-semibold">Score</p>
+       <p id="scoreDisplay" class="text-3xl font-bold text-blue-600">0</p>
+      </div>
+     </div><!-- Game Canvas and Controls -->
+     <div class="flex gap-4 flex-wrap lg:flex-nowrap">
+      <div class="flex-1 min-w-0">
+       <canvas id="gameCanvas" width="800" height="600" class="w-full rounded-lg bg-gray-900"></canvas>
+      </div><!-- Control Panel -->
+      <div class="w-full lg:w-80">
+       <div class="bg-white rounded-lg p-6 shadow-xl">
+        <h3 class="text-2xl font-bold mb-4 text-gray-800">Tower Shop</h3>
+        <div id="towerShop" class="space-y-3"><!-- Towers will be added here -->
+        </div>
+        <div class="mt-6 pt-6 border-t border-gray-200"><button id="deleteTowerBtn" class="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-lg font-bold hover:from-red-600 hover:to-red-700 transition shadow-md mb-2"> 🗑️ Hapus Tower </button> <button id="answerQuizBtn" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-lg font-bold hover:from-blue-600 hover:to-indigo-700 transition shadow-md mb-2"> 📚 Jawab Soal </button> <button id="startWaveBtn" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg font-bold hover:from-green-600 hover:to-emerald-700 transition shadow-md"> Mulai Wave </button> <button id="saveGameBtn" class="w-full mt-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-white py-2 rounded-lg font-semibold hover:from-yellow-600 hover:to-orange-700 transition"> Simpan Game </button> <button id="exitGameBtn" class="w-full mt-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white py-2 rounded-lg font-semibold hover:from-gray-600 hover:to-gray-700 transition"> Keluar ke Menu </button>
+        </div>
+        <div id="tipsBox" class="mt-4 p-4 bg-blue-50 rounded-lg">
+         <p class="text-sm text-gray-700 font-semibold mb-2">💡 Tips:</p>
+         <p id="tipsText" class="text-xs text-gray-600">Start wave terlebih dahulu untuk unlock quiz! Jawab soal saat wave berlangsung untuk dapat gold extra!</p>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div><!-- Quiz Modal -->
+   <div id="quizModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full slide-up">
+     <div class="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-t-xl">
+      <h3 class="text-2xl font-bold">Quiz Time! 📚</h3>
+      <p class="text-sm opacity-90 mt-1">Answer correctly to earn gold</p>
+     </div>
+     <div class="p-6">
+      <div class="mb-4"><span id="quizCategory" class="inline-block bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-semibold">Category</span> <span id="quizDifficulty" class="inline-block bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold ml-2">Easy</span> <span id="quizReward" class="inline-block bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-semibold ml-2">+50 Gold</span>
+      </div>
+      <p id="quizQuestion" class="text-xl font-semibold text-gray-800 mb-6">Question will appear here</p>
+      <div id="quizOptions" class="space-y-3"><!-- Options will be added here -->
+      </div>
+      <div id="quizFeedback" class="hidden mt-6 p-4 rounded-lg">
+       <p class="font-bold text-lg mb-2"></p>
+       <p class="text-sm"></p>
+      </div><button id="closeQuizBtn" class="hidden mt-4 w-full bg-gray-500 text-white py-3 rounded-lg font-bold hover:bg-gray-600 transition"> Close </button>
+     </div>
+    </div>
+   </div><!-- Stats Screen -->
+   <div id="statsScreen" class="hidden min-h-full p-8">
+    <div class="max-w-4xl mx-auto">
+     <div class="bg-white rounded-lg shadow-2xl p-8">
+      <h2 class="text-4xl font-bold mb-8 text-center text-purple-600">Game Statistics</h2>
+      <div id="statsContent" class="grid grid-cols-2 gap-6">
+       <div class="col-span-2 text-center bg-purple-50 p-6 rounded-lg">
+        <p class="text-4xl font-bold text-purple-600 mb-2">Crystal Defenders Quiz</p>
+        <p class="text-gray-600">Your Statistics</p>
+       </div>
+      </div>
+      <div class="mt-8 text-center"><button id="backFromStatsBtn" class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-8 py-3 rounded-lg font-bold hover:from-purple-600 hover:to-pink-700 transition shadow-lg"> Back to Menu </button>
+      </div>
+     </div>
+    </div>
+   </div><!-- Load Game Screen -->
+   <div id="loadScreen" class="hidden min-h-full p-8">
+    <div class="max-w-4xl mx-auto">
+     <div class="bg-white rounded-lg shadow-2xl p-8">
+      <h2 class="text-4xl font-bold mb-8 text-center text-purple-600">Load Saved Game</h2>
+      <div id="savedGames" class="space-y-4"><!-- Saved games will be listed here -->
+      </div>
+      <div class="mt-8 text-center"><button id="backFromLoadBtn" class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-8 py-3 rounded-lg font-bold hover:from-gray-600 hover:to-gray-700 transition shadow-lg"> Back to Menu </button>
+      </div>
+     </div>
+    </div>
+   </div><!-- Game Over Screen -->
+   <div id="gameOverScreen" class="hidden min-h-full p-8 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-2xl p-8 max-w-2xl w-full text-center">
+     <h2 id="gameOverTitle" class="text-5xl font-bold mb-4 text-red-600">Game Over</h2>
+     <p id="gameOverMessage" class="text-xl text-gray-700 mb-8">You survived 10 waves!</p>
+     <div class="grid grid-cols-3 gap-4 mb-8">
+      <div class="bg-purple-50 p-4 rounded-lg">
+       <p class="text-sm text-gray-600">Final Wave</p>
+       <p id="finalWave" class="text-2xl font-bold text-purple-600">10</p>
+      </div>
+      <div class="bg-yellow-50 p-4 rounded-lg">
+       <p class="text-sm text-gray-600">Gold Earned</p>
+       <p id="finalGold" class="text-2xl font-bold text-yellow-600">2500</p>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-lg">
+       <p class="text-sm text-gray-600">Enemies Defeated</p>
+       <p id="finalKills" class="text-2xl font-bold text-blue-600">150</p>
+      </div>
+     </div>
+     <div class="flex gap-4 justify-center"><button id="playAgainBtn" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-lg text-xl font-bold hover:from-green-600 hover:to-emerald-700 transition shadow-lg"> Play Again </button> <button id="mainMenuBtn" class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-8 py-4 rounded-lg text-xl font-bold hover:from-gray-600 hover:to-gray-700 transition shadow-lg"> Main Menu </button>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+    // Audio Manager using Web Audio API
+    const AudioManager = {
+      audioContext: null,
+      muted: false,
+      
+      init() {
+        try {
+          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+          console.log('Web Audio API not supported');
+        }
+      },
+      
+      playTone(frequency, duration, type = 'sine', volume = 0.3) {
+        if (this.muted || !this.audioContext) return;
+        
+        try {
+          const oscillator = this.audioContext.createOscillator();
+          const gainNode = this.audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(this.audioContext.destination);
+          
+          oscillator.frequency.value = frequency;
+          oscillator.type = type;
+          
+          gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+          
+          oscillator.start(this.audioContext.currentTime);
+          oscillator.stop(this.audioContext.currentTime + duration);
+        } catch (e) {
+          console.log('Error playing sound');
+        }
+      },
+      
+      playSequence(frequencies, duration = 0.15) {
+        if (this.muted || !this.audioContext) return;
+        
+        frequencies.forEach((freq, index) => {
+          setTimeout(() => {
+            this.playTone(freq, duration);
+          }, index * duration * 1000);
+        });
+      },
+      
+      shoot() {
+        this.playTone(800, 0.08, 'square', 0.2);
+      },
+      
+      hit() {
+        this.playTone(200, 0.1, 'sawtooth', 0.25);
+      },
+      
+      kill() {
+        this.playSequence([400, 300], 0.1);
+      },
+      
+      place() {
+        this.playTone(600, 0.08, 'sine', 0.3);
+      },
+      
+      correct() {
+        this.playSequence([523, 659, 784], 0.15);
+      },
+      
+      wrong() {
+        this.playSequence([400, 300, 200], 0.2);
+      },
+      
+      wave() {
+        this.playSequence([440, 554, 659], 0.2);
+      },
+      
+      lose() {
+        this.playSequence([400, 350, 300, 250, 200], 0.15);
+      },
+      
+      win() {
+        this.playSequence([523, 659, 784, 1047], 0.2);
+      },
+      
+      click() {
+        this.playTone(1000, 0.05, 'sine', 0.15);
+      },
+      
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+    };
+    
+    // LocalStorage Manager
+    const StorageManager = {
+      QUESTIONS_KEY: 'crystal_quiz_questions',
+      SAVES_KEY: 'crystal_quiz_saves',
+      
+      getQuestions() {
+        const data = localStorage.getItem(this.QUESTIONS_KEY);
+        return data ? JSON.parse(data) : [];
+      },
+      
+      saveQuestions(questions) {
+        localStorage.setItem(this.QUESTIONS_KEY, JSON.stringify(questions));
+      },
+      
+      addQuestion(question) {
+        const questions = this.getQuestions();
+        questions.push(question);
+        this.saveQuestions(questions);
+      },
+      
+      deleteQuestion(id) {
+        const questions = this.getQuestions();
+        const filtered = questions.filter(q => q.id !== id);
+        this.saveQuestions(filtered);
+      },
+      
+      getSavedGames() {
+        const data = localStorage.getItem(this.SAVES_KEY);
+        return data ? JSON.parse(data) : [];
+      },
+      
+      saveGame(saveData) {
+        const saves = this.getSavedGames();
+        saves.push(saveData);
+        localStorage.setItem(this.SAVES_KEY, JSON.stringify(saves));
+      },
+      
+      deleteSave(id) {
+        const saves = this.getSavedGames();
+        const filtered = saves.filter(s => s.id !== id);
+        localStorage.setItem(this.SAVES_KEY, JSON.stringify(filtered));
+      }
+    };
+    
+    // Game State
+    const gameState = {
+      wave: 1,
+      gold: 100,
+      lives: 20,
+      score: 0,
+      selectedTower: null,
+      towers: [],
+      enemies: [],
+      projectiles: [],
+      waveActive: false,
+      enemiesSpawned: 0,
+      enemiesKilled: 0,
+      gameRunning: false,
+      animationId: null,
+      questionsAnswered: 0,
+      deleteMode: false
+    };
+    
+    // Questions storage
+    let allQuestions = [];
+    let allSavedGames = [];
+    let parsedBulkQuestions = [];
+    
+    // Tower Definitions
+    const towerTypes = {
+      archer: {
+        name: 'Archer Tower',
+        cost: 100,
+        damage: 20,
+        range: 120,
+        fireRate: 1000,
+        color: '#10b981',
+        icon: '🏹',
+        description: 'Basic ranged tower'
+      },
+      cannon: {
+        name: 'Cannon Tower',
+        cost: 200,
+        damage: 50,
+        range: 100,
+        fireRate: 2000,
+        color: '#ef4444',
+        icon: '💣',
+        description: 'High damage, slow fire'
+      },
+      ice: {
+        name: 'Ice Tower',
+        cost: 150,
+        damage: 10,
+        range: 130,
+        fireRate: 800,
+        color: '#3b82f6',
+        icon: '❄️',
+        description: 'Slows enemies'
+      },
+      lightning: {
+        name: 'Lightning Tower',
+        cost: 250,
+        damage: 30,
+        range: 150,
+        fireRate: 1500,
+        color: '#eab308',
+        icon: '⚡',
+        description: 'Chain lightning attacks'
+      }
+    };
+    
+    // Enemy path - longer and more winding
+    const enemyPath = [
+      { x: 0, y: 300 },
+      { x: 150, y: 300 },
+      { x: 150, y: 100 },
+      { x: 300, y: 100 },
+      { x: 300, y: 250 },
+      { x: 450, y: 250 },
+      { x: 450, y: 150 },
+      { x: 600, y: 150 },
+      { x: 600, y: 400 },
+      { x: 450, y: 400 },
+      { x: 450, y: 500 },
+      { x: 300, y: 500 },
+      { x: 300, y: 350 },
+      { x: 150, y: 350 },
+      { x: 150, y: 450 },
+      { x: 650, y: 450 },
+      { x: 650, y: 300 },
+      { x: 800, y: 300 }
+    ];
+    
+    // Canvas setup
+    let canvas, ctx;
+    
+    // Initialize app
+    function initApp() {
+      canvas = document.getElementById('gameCanvas');
+      ctx = canvas.getContext('2d');
+      
+      AudioManager.init();
+      
+      loadData();
+      setupEventListeners();
+      createTowerShop();
+      updateSoundToggle();
+    }
+    
+    function loadData() {
+      allQuestions = StorageManager.getQuestions();
+      allSavedGames = StorageManager.getSavedGames();
+    }
+    
+    function setupEventListeners() {
+      document.getElementById('startGameBtn').addEventListener('click', () => {
+        AudioManager.click();
+        startNewGame();
+      });
+      document.getElementById('adminBtn').addEventListener('click', () => {
+        AudioManager.click();
+        showAdminPanel();
+      });
+      document.getElementById('statsBtn').addEventListener('click', () => {
+        AudioManager.click();
+        showStats();
+      });
+      document.getElementById('loadBtn').addEventListener('click', () => {
+        AudioManager.click();
+        showLoadScreen();
+      });
+      document.getElementById('backFromAdminBtn').addEventListener('click', () => {
+        AudioManager.click();
+        showMainMenu();
+      });
+      document.getElementById('backFromStatsBtn').addEventListener('click', () => {
+        AudioManager.click();
+        showMainMenu();
+      });
+      document.getElementById('backFromLoadBtn').addEventListener('click', () => {
+        AudioManager.click();
+        showMainMenu();
+      });
+      document.getElementById('startWaveBtn').addEventListener('click', () => {
+        AudioManager.wave();
+        startWave();
+      });
+      document.getElementById('answerQuizBtn').addEventListener('click', () => {
+        AudioManager.click();
+        showQuiz();
+      });
+      document.getElementById('saveGameBtn').addEventListener('click', () => {
+        AudioManager.click();
+        saveGame();
+      });
+      document.getElementById('exitGameBtn').addEventListener('click', () => {
+        AudioManager.click();
+        exitGame();
+      });
+      document.getElementById('deleteTowerBtn').addEventListener('click', () => {
+        AudioManager.click();
+        toggleDeleteMode();
+      });
+      document.getElementById('playAgainBtn').addEventListener('click', () => {
+        AudioManager.click();
+        startNewGame();
+      });
+      document.getElementById('mainMenuBtn').addEventListener('click', () => {
+        AudioManager.click();
+        showMainMenu();
+      });
+      document.getElementById('closeQuizBtn').addEventListener('click', () => {
+        AudioManager.click();
+        closeQuiz();
+      });
+      
+      document.getElementById('soundToggle').addEventListener('click', () => {
+        AudioManager.toggleMute();
+        updateSoundToggle();
+        AudioManager.click();
+      });
+      
+      document.getElementById('singleTabBtn').addEventListener('click', () => {
+        AudioManager.click();
+        switchTab('single');
+      });
+      document.getElementById('bulkTabBtn').addEventListener('click', () => {
+        AudioManager.click();
+        switchTab('bulk');
+      });
+      
+      document.getElementById('addQuestionForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        addQuestion();
+      });
+      
+      document.getElementById('previewBulkBtn').addEventListener('click', () => {
+        AudioManager.click();
+        previewBulkQuestions();
+      });
+      document.getElementById('bulkImportForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        importBulkQuestions();
+      });
+      
+      document.getElementById('deleteAllQuestionsBtn').addEventListener('click', () => {
+        AudioManager.click();
+        deleteAllQuestions();
+      });
+      
+      canvas.addEventListener('click', handleCanvasClick);
+    }
+    
+    function updateSoundToggle() {
+      const btn = document.getElementById('soundToggle');
+      btn.textContent = AudioManager.muted ? '🔇' : '🔊';
+      btn.title = AudioManager.muted ? 'Sound Off (Click to enable)' : 'Sound On (Click to disable)';
+    }
+    
+    function switchTab(tab) {
+      const singleTab = document.getElementById('singleTabBtn');
+      const bulkTab = document.getElementById('bulkTabBtn');
+      const singlePanel = document.getElementById('singleQuestionPanel');
+      const bulkPanel = document.getElementById('bulkImportPanel');
+      
+      if (tab === 'single') {
+        singleTab.classList.add('active');
+        bulkTab.classList.remove('active');
+        singlePanel.classList.remove('hidden');
+        bulkPanel.classList.add('hidden');
+      } else {
+        bulkTab.classList.add('active');
+        singleTab.classList.remove('active');
+        bulkPanel.classList.remove('hidden');
+        singlePanel.classList.add('hidden');
+      }
+    }
+    
+    function parseBulkText(text) {
+      const questions = [];
+      const errors = [];
+      
+      const blocks = text.trim().split(/\n\s*\n/);
+      
+      blocks.forEach((block, index) => {
+        const lines = block.trim().split('\n').map(l => l.trim()).filter(l => l);
+        
+        if (lines.length < 6) {
+          errors.push(`Block ${index + 1}: Not enough lines (need at least 6: Q, A, B, C, D, Category, Difficulty)`);
+          return;
+        }
+        
+        const questionObj = {};
+        let correctAnswer = '';
+        
+        lines.forEach(line => {
+          if (line.startsWith('Q:')) {
+            questionObj.question = line.substring(2).trim();
+          } else if (line.startsWith('A:')) {
+            const text = line.substring(2).trim();
+            if (text.endsWith('*')) {
+              questionObj.optionA = text.slice(0, -1).trim();
+              correctAnswer = 'A';
+            } else {
+              questionObj.optionA = text;
+            }
+          } else if (line.startsWith('B:')) {
+            const text = line.substring(2).trim();
+            if (text.endsWith('*')) {
+              questionObj.optionB = text.slice(0, -1).trim();
+              correctAnswer = 'B';
+            } else {
+              questionObj.optionB = text;
+            }
+          } else if (line.startsWith('C:')) {
+            const text = line.substring(2).trim();
+            if (text.endsWith('*')) {
+              questionObj.optionC = text.slice(0, -1).trim();
+              correctAnswer = 'C';
+            } else {
+              questionObj.optionC = text;
+            }
+          } else if (line.startsWith('D:')) {
+            const text = line.substring(2).trim();
+            if (text.endsWith('*')) {
+              questionObj.optionD = text.slice(0, -1).trim();
+              correctAnswer = 'D';
+            } else {
+              questionObj.optionD = text;
+            }
+          } else if (line.toLowerCase().startsWith('category:')) {
+            questionObj.category = line.substring(9).trim();
+          } else if (line.toLowerCase().startsWith('difficulty:')) {
+            questionObj.difficulty = line.substring(11).trim().toLowerCase();
+          }
+        });
+        
+        if (!questionObj.question) {
+          errors.push(`Block ${index + 1}: Missing question (Q:)`);
+        }
+        if (!questionObj.optionA || !questionObj.optionB || !questionObj.optionC || !questionObj.optionD) {
+          errors.push(`Block ${index + 1}: Missing one or more options (A:, B:, C:, D:)`);
+        }
+        if (!correctAnswer) {
+          errors.push(`Block ${index + 1}: No correct answer marked with *`);
+        }
+        if (!questionObj.category) {
+          errors.push(`Block ${index + 1}: Missing category`);
+        }
+        if (!questionObj.difficulty || !['easy', 'medium', 'hard'].includes(questionObj.difficulty)) {
+          errors.push(`Block ${index + 1}: Missing or invalid difficulty (must be: easy, medium, or hard)`);
+        }
+        
+        if (Object.keys(questionObj).length === 7 && correctAnswer) {
+          questionObj.correctAnswer = correctAnswer;
+          questions.push(questionObj);
+        }
+      });
+      
+      return { questions, errors };
+    }
+    
+    function previewBulkQuestions() {
+      const text = document.getElementById('bulkTextArea').value;
+      const { questions, errors } = parseBulkText(text);
+      
+      parsedBulkQuestions = questions;
+      
+      const previewDiv = document.getElementById('bulkPreview');
+      const previewContent = document.getElementById('bulkPreviewContent');
+      const errorDiv = document.getElementById('bulkError');
+      const errorContent = document.getElementById('bulkErrorContent');
+      const submitBtn = document.getElementById('submitBulkBtn');
+      
+      if (errors.length > 0) {
+        errorDiv.classList.remove('hidden');
+        errorContent.innerHTML = errors.map(e => `<p>• ${e}</p>`).join('');
+        previewDiv.classList.add('hidden');
+        submitBtn.disabled = true;
+      } else {
+        errorDiv.classList.add('hidden');
+      }
+      
+      if (questions.length > 0) {
+        previewDiv.classList.remove('hidden');
+        
+        const difficultyPoints = { easy: 50, medium: 100, hard: 200 };
+        
+        previewContent.innerHTML = `
+          <p class="mb-3 font-bold text-green-700">Found ${questions.length} valid question(s):</p>
+          ${questions.map((q, i) => `
+            <div class="bg-gray-50 p-3 mb-2 rounded border border-gray-200">
+              <p class="font-bold text-gray-800">${i + 1}. ${q.question}</p>
+              <div class="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-1">
+                <p>A: ${q.optionA} ${q.correctAnswer === 'A' ? '✅' : ''}</p>
+                <p>B: ${q.optionB} ${q.correctAnswer === 'B' ? '✅' : ''}</p>
+                <p>C: ${q.optionC} ${q.correctAnswer === 'C' ? '✅' : ''}</p>
+                <p>D: ${q.optionD} ${q.correctAnswer === 'D' ? '✅' : ''}</p>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">
+                <span class="font-semibold">${q.category}</span> • 
+                <span class="uppercase">${q.difficulty}</span> • 
+                ${difficultyPoints[q.difficulty]} Gold
+              </p>
+            </div>
+          `).join('')}
+        `;
+        
+        submitBtn.disabled = false;
+      } else {
+        previewDiv.classList.add('hidden');
+        submitBtn.disabled = true;
+      }
+    }
+    
+    function importBulkQuestions() {
+      if (parsedBulkQuestions.length === 0) {
+        showNotification('Please preview questions first!', 'error');
+        return;
+      }
+      
+      const submitBtn = document.getElementById('submitBulkBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = `Importing ${parsedBulkQuestions.length} questions...`;
+      
+      const difficultyPoints = { easy: 50, medium: 100, hard: 200 };
+      
+      parsedBulkQuestions.forEach(q => {
+        const questionData = {
+          id: 'q_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          question_text: q.question,
+          option_a: q.optionA,
+          option_b: q.optionB,
+          option_c: q.optionC,
+          option_d: q.optionD,
+          correct_answer: q.correctAnswer,
+          difficulty: q.difficulty,
+          category: q.category,
+          points: difficultyPoints[q.difficulty],
+          is_active: true,
+          timestamp: new Date().toISOString()
+        };
+        
+        StorageManager.addQuestion(questionData);
+      });
+      
+      loadData();
+      AudioManager.correct();
+      showNotification(`Successfully imported ${parsedBulkQuestions.length} questions!`, 'success');
+      
+      document.getElementById('bulkTextArea').value = '';
+      document.getElementById('bulkPreview').classList.add('hidden');
+      parsedBulkQuestions = [];
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = '✅ Import All Questions';
+      
+      switchTab('single');
+      updateQuestionsList();
+    }
+    
+    function createTowerShop() {
+      const shop = document.getElementById('towerShop');
+      
+      Object.entries(towerTypes).forEach(([key, tower]) => {
+        const btn = document.createElement('button');
+        btn.className = 'tower-btn w-full bg-white border-2 border-gray-200 rounded-lg p-4 text-left hover:border-purple-400 transition';
+        btn.innerHTML = `
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">${tower.icon}</span>
+            <div class="flex-1">
+              <p class="font-bold text-gray-800">${tower.name}</p>
+              <p class="text-xs text-gray-600">${tower.description}</p>
+              <div class="flex gap-2 mt-1 text-xs">
+                <span class="text-red-600">⚔️ ${tower.damage}</span>
+                <span class="text-blue-600">��� ${tower.range}</span>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-lg font-bold text-yellow-600">${tower.cost}💰</p>
+            </div>
+          </div>
+        `;
+        btn.dataset.towerType = key;
+        btn.addEventListener('click', () => {
+          AudioManager.click();
+          selectTower(key, btn);
+        });
+        shop.appendChild(btn);
+      });
+    }
+    
+    function showAdminPanel() {
+      showScreen('adminPanel');
+      updateQuestionsList();
+    }
+    
+    function addQuestion() {
+      const submitBtn = document.getElementById('submitQuestionBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Adding...';
+      
+      const difficulty = document.getElementById('difficulty').value;
+      const points = difficulty === 'easy' ? 50 : difficulty === 'medium' ? 100 : 200;
+      
+      const questionData = {
+        id: 'q_' + Date.now(),
+        question_text: document.getElementById('questionText').value,
+        option_a: document.getElementById('optionA').value,
+        option_b: document.getElementById('optionB').value,
+        option_c: document.getElementById('optionC').value,
+        option_d: document.getElementById('optionD').value,
+        correct_answer: document.getElementById('correctAnswer').value,
+        difficulty: difficulty,
+        category: document.getElementById('category').value,
+        points: points,
+        is_active: true,
+        timestamp: new Date().toISOString()
+      };
+      
+      StorageManager.addQuestion(questionData);
+      loadData();
+      
+      AudioManager.correct();
+      showNotification('Question added successfully!', 'success');
+      document.getElementById('addQuestionForm').reset();
+      updateQuestionsList();
+      
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Add Question';
+    }
+    
+    function deleteAllQuestions() {
+      if (allQuestions.length === 0) {
+        showNotification('No questions to delete!', 'error');
+        return;
+      }
+      
+      const deleteBtn = document.getElementById('deleteAllQuestionsBtn');
+      const originalText = deleteBtn.innerHTML;
+      
+      deleteBtn.innerHTML = '⚠️ Click Again to Confirm';
+      deleteBtn.style.background = '#dc2626';
+      
+      const confirmDelete = () => {
+        localStorage.setItem(StorageManager.QUESTIONS_KEY, JSON.stringify([]));
+        loadData();
+        updateQuestionsList();
+        AudioManager.kill();
+        showNotification('All questions deleted!', 'success');
+        
+        deleteBtn.removeEventListener('click', confirmDelete);
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.style.background = '';
+      };
+      
+      const cancelDelete = () => {
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.style.background = '';
+        deleteBtn.removeEventListener('click', confirmDelete);
+      };
+      
+      deleteBtn.addEventListener('click', confirmDelete, { once: true });
+      
+      setTimeout(() => {
+        cancelDelete();
+      }, 3000);
+    }
+    
+    function updateQuestionsList() {
+      const container = document.getElementById('questionsList');
+      const deleteAllBtn = document.getElementById('deleteAllQuestionsBtn');
+      
+      document.getElementById('questionCount').textContent = allQuestions.length;
+      deleteAllBtn.disabled = allQuestions.length === 0;
+      
+      if (allQuestions.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-500 py-8">No questions yet. Add your first question above!</p>';
+        return;
+      }
+      
+      container.innerHTML = '';
+      allQuestions.forEach(q => {
+        const card = document.createElement('div');
+        card.className = 'bg-gray-50 border-2 border-gray-200 rounded-lg p-4';
+        
+        const difficultyColors = {
+          easy: 'bg-green-100 text-green-700',
+          medium: 'bg-yellow-100 text-yellow-700',
+          hard: 'bg-red-100 text-red-700'
+        };
+        
+        card.innerHTML = `
+          <div class="flex justify-between items-start mb-3">
+            <div class="flex-1">
+              <p class="font-bold text-gray-800 mb-2">${q.question_text}</p>
+              <div class="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
+                <p>A: ${q.option_a}</p>
+                <p>B: ${q.option_b}</p>
+                <p>C: ${q.option_c}</p>
+                <p>D: ${q.option_d}</p>
+              </div>
+              <div class="flex gap-2 flex-wrap">
+                <span class="${difficultyColors[q.difficulty]} px-2 py-1 rounded text-xs font-semibold">${q.difficulty.toUpperCase()}</span>
+                <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold">${q.category}</span>
+                <span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-semibold">✓ ${q.correct_answer}</span>
+                <span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-semibold">${q.points} Gold</span>
+              </div>
+            </div>
+            <button class="delete-question-btn ml-4 bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition text-sm" data-id="${q.id}">
+              Delete
+            </button>
+          </div>
+        `;
+        
+        container.appendChild(card);
+      });
+      
+      document.querySelectorAll('.delete-question-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          AudioManager.hit();
+          StorageManager.deleteQuestion(btn.dataset.id);
+          loadData();
+          updateQuestionsList();
+          showNotification('Question deleted', 'success');
+        });
+      });
+    }
+    
+    function showQuiz() {
+      if (allQuestions.length === 0) {
+        showNotification('No questions available! Add questions in Question Manager first.', 'error');
+        return;
+      }
+      
+      const activeQuestions = allQuestions.filter(q => q.is_active);
+      if (activeQuestions.length === 0) {
+        showNotification('No active questions available!', 'error');
+        return;
+      }
+      
+      const question = activeQuestions[Math.floor(Math.random() * activeQuestions.length)];
+      
+      document.getElementById('quizCategory').textContent = question.category;
+      document.getElementById('quizDifficulty').textContent = question.difficulty.toUpperCase();
+      document.getElementById('quizReward').textContent = `+${question.points} Gold`;
+      document.getElementById('quizQuestion').textContent = question.question_text;
+      
+      const optionsContainer = document.getElementById('quizOptions');
+      optionsContainer.innerHTML = '';
+      
+      const options = [
+        { label: 'A', text: question.option_a },
+        { label: 'B', text: question.option_b },
+        { label: 'C', text: question.option_c },
+        { label: 'D', text: question.option_d }
+      ];
+      
+      options.forEach(option => {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-option w-full bg-white border-2 border-gray-300 rounded-lg p-4 text-left hover:bg-purple-50 transition';
+        btn.innerHTML = `
+          <span class="font-bold text-purple-600">${option.label}.</span>
+          <span class="ml-2 text-gray-800">${option.text}</span>
+        `;
+        btn.addEventListener('click', () => {
+          AudioManager.click();
+          checkAnswer(option.label, question);
+        });
+        optionsContainer.appendChild(btn);
+      });
+      
+      document.getElementById('quizFeedback').classList.add('hidden');
+      document.getElementById('closeQuizBtn').classList.add('hidden');
+      document.getElementById('quizModal').classList.remove('hidden');
+    }
+    
+    function checkAnswer(selectedAnswer, question) {
+      const options = document.querySelectorAll('.quiz-option');
+      options.forEach(opt => opt.disabled = true);
+      
+      const isCorrect = selectedAnswer === question.correct_answer;
+      
+      options.forEach((opt, index) => {
+        const label = ['A', 'B', 'C', 'D'][index];
+        if (label === question.correct_answer) {
+          opt.classList.add('correct');
+        } else if (label === selectedAnswer && !isCorrect) {
+          opt.classList.add('incorrect');
+        }
+      });
+      
+      const feedback = document.getElementById('quizFeedback');
+      feedback.classList.remove('hidden');
+      
+      if (isCorrect) {
+        AudioManager.correct();
+        feedback.className = 'mt-6 p-4 rounded-lg bg-green-100 border-2 border-green-500';
+        feedback.innerHTML = `
+          <p class="font-bold text-lg mb-2 text-green-700">✅ Correct!</p>
+          <p class="text-sm text-green-600">You earned ${question.points} gold!</p>
+        `;
+        gameState.gold += question.points;
+        gameState.score += question.points * 2;
+        gameState.questionsAnswered++;
+      } else {
+        AudioManager.wrong();
+        feedback.className = 'mt-6 p-4 rounded-lg bg-red-100 border-2 border-red-500';
+        feedback.innerHTML = `
+          <p class="font-bold text-lg mb-2 text-red-700">❌ Incorrect</p>
+          <p class="text-sm text-red-600">The correct answer was ${question.correct_answer}</p>
+        `;
+      }
+      
+      updateUI();
+      document.getElementById('closeQuizBtn').classList.remove('hidden');
+    }
+    
+    function closeQuiz() {
+      document.getElementById('quizModal').classList.add('hidden');
+    }
+    
+    function toggleDeleteMode() {
+      gameState.deleteMode = !gameState.deleteMode;
+      const deleteBtn = document.getElementById('deleteTowerBtn');
+      const tipsText = document.getElementById('tipsText');
+      
+      if (gameState.deleteMode) {
+        gameState.selectedTower = null;
+        document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+        deleteBtn.classList.add('border-4', 'border-yellow-400');
+        deleteBtn.innerHTML = '✅ Mode Hapus Aktif';
+        tipsText.textContent = 'Klik tower di peta untuk menghapusnya. Dapat refund 50% gold!';
+        canvas.style.cursor = 'not-allowed';
+      } else {
+        deleteBtn.classList.remove('border-4', 'border-yellow-400');
+        deleteBtn.innerHTML = '🗑️ Hapus Tower';
+        tipsText.textContent = 'Start wave terlebih dahulu untuk unlock quiz! Jawab soal saat wave berlangsung untuk dapat gold extra!';
+        canvas.style.cursor = 'crosshair';
+      }
+    }
+    
+    function selectTower(type, btn) {
+      if (gameState.deleteMode) {
+        gameState.deleteMode = false;
+        toggleDeleteMode();
+      }
+      
+      document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+      
+      if (gameState.selectedTower === type) {
+        gameState.selectedTower = null;
+      } else {
+        gameState.selectedTower = type;
+        btn.classList.add('selected');
+      }
+    }
+    
+    function handleCanvasClick(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+      
+      // Delete mode
+      if (gameState.deleteMode) {
+        let towerToDelete = null;
+        let towerIndex = -1;
+        
+        gameState.towers.forEach((tower, index) => {
+          const dist = Math.hypot(tower.x - x, tower.y - y);
+          if (dist < 25) {
+            towerToDelete = tower;
+            towerIndex = index;
+          }
+        });
+        
+        if (towerToDelete) {
+          const towerDef = towerTypes[towerToDelete.type];
+          const refund = Math.floor(towerDef.cost * 0.5);
+          
+          gameState.towers.splice(towerIndex, 1);
+          gameState.gold += refund;
+          
+          AudioManager.hit();
+          showNotification(`Tower dihapus! +${refund} Gold (50% refund)`, 'success');
+          updateUI();
+        }
+        return;
+      }
+      
+      // Place tower mode
+      if (!gameState.selectedTower) return;
+      
+      const tower = towerTypes[gameState.selectedTower];
+      
+      if (gameState.gold >= tower.cost && !isOnPath(x, y) && !isTooCloseToOtherTowers(x, y)) {
+        gameState.towers.push({
+          x, y,
+          type: gameState.selectedTower,
+          lastFire: 0,
+          level: 1
+        });
+        
+        gameState.gold -= tower.cost;
+        AudioManager.place();
+        updateUI();
+        gameState.selectedTower = null;
+        document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+      }
+    }
+    
+    function isOnPath(x, y) {
+      for (let i = 0; i < enemyPath.length - 1; i++) {
+        const p1 = enemyPath[i];
+        const p2 = enemyPath[i + 1];
+        const dist = distanceToSegment(x, y, p1.x, p1.y, p2.x, p2.y);
+        if (dist < 40) return true;
+      }
+      return false;
+    }
+    
+    function isTooCloseToOtherTowers(x, y) {
+      return gameState.towers.some(t => {
+        const dist = Math.hypot(t.x - x, t.y - y);
+        return dist < 50;
+      });
+    }
+    
+    function distanceToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+      const nearestX = x1 + t * dx;
+      const nearestY = y1 + t * dy;
+      return Math.hypot(px - nearestX, py - nearestY);
+    }
+    
+    function startNewGame() {
+      gameState.wave = 1;
+      gameState.gold = 100;
+      gameState.lives = 20;
+      gameState.score = 0;
+      gameState.towers = [];
+      gameState.enemies = [];
+      gameState.projectiles = [];
+      gameState.waveActive = false;
+      gameState.enemiesSpawned = 0;
+      gameState.enemiesKilled = 0;
+      gameState.gameRunning = true;
+      gameState.questionsAnswered = 0;
+      gameState.deleteMode = false;
+      
+      showScreen('gameScreen');
+      updateUI();
+      
+      // Reset delete button
+      const deleteBtn = document.getElementById('deleteTowerBtn');
+      deleteBtn.classList.remove('border-4', 'border-yellow-400');
+      deleteBtn.innerHTML = '🗑️ Hapus Tower';
+      canvas.style.cursor = 'crosshair';
+      
+      // Lock quiz button until first wave starts
+      const quizBtn = document.getElementById('answerQuizBtn');
+      quizBtn.disabled = true;
+      quizBtn.innerHTML = '🔒 Start Wave untuk Unlock Quiz';
+      quizBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      
+      gameLoop();
+    }
+    
+    function startWave() {
+      if (gameState.waveActive) return;
+      
+      gameState.waveActive = true;
+      gameState.enemiesSpawned = 0;
+      document.getElementById('startWaveBtn').disabled = true;
+      
+      // Unlock quiz button when wave starts
+      const quizBtn = document.getElementById('answerQuizBtn');
+      quizBtn.disabled = false;
+      quizBtn.innerHTML = '📚 Jawab Soal';
+      quizBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      
+      const enemiesToSpawn = 5 + gameState.wave * 2;
+      const spawnDelay = Math.max(500, 1500 - gameState.wave * 30);
+      
+      const spawnInterval = setInterval(() => {
+        if (gameState.enemiesSpawned >= enemiesToSpawn || !gameState.gameRunning) {
+          clearInterval(spawnInterval);
+          return;
+        }
+        
+        spawnEnemy();
+        gameState.enemiesSpawned++;
+      }, spawnDelay);
+    }
+    
+    function spawnEnemy() {
+      const health = 50 + gameState.wave * 25;
+      const speed = 1 + gameState.wave * 0.15;
+      
+      gameState.enemies.push({
+        x: enemyPath[0].x,
+        y: enemyPath[0].y,
+        pathIndex: 0,
+        health: health,
+        maxHealth: health,
+        speed: speed,
+        reward: 25 + gameState.wave * 5
+      });
+    }
+    
+    function gameLoop() {
+      if (!gameState.gameRunning) return;
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      drawPath();
+      updateEnemies();
+      updateTowers();
+      updateProjectiles();
+      drawTowers();
+      drawEnemies();
+      drawProjectiles();
+      
+      if (gameState.waveActive && gameState.enemies.length === 0 && 
+          gameState.enemiesSpawned >= 5 + (gameState.wave - 1) * 2) {
+        endWave();
+      }
+      
+      if (gameState.lives <= 0) {
+        gameOver(false);
+        return;
+      }
+      
+      gameState.animationId = requestAnimationFrame(gameLoop);
+    }
+    
+    function drawPath() {
+      ctx.strokeStyle = '#4a5568';
+      ctx.lineWidth = 40;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(enemyPath[0].x, enemyPath[0].y);
+      
+      for (let i = 1; i < enemyPath.length; i++) {
+        ctx.lineTo(enemyPath[i].x, enemyPath[i].y);
+      }
+      ctx.stroke();
+      
+      ctx.fillStyle = '#a78bfa';
+      ctx.shadowColor = '#a78bfa';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(enemyPath[enemyPath.length - 1].x, enemyPath[enemyPath.length - 1].y, 20, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    
+    function drawTowers() {
+      gameState.towers.forEach(tower => {
+        const towerDef = towerTypes[tower.type];
+        
+        if (gameState.selectedTower === tower.type) {
+          ctx.strokeStyle = towerDef.color + '40';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(tower.x, tower.y, towerDef.range, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        
+        ctx.fillStyle = towerDef.color;
+        ctx.shadowColor = towerDef.color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        ctx.font = '24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(towerDef.icon, tower.x, tower.y);
+      });
+    }
+    
+    function drawEnemies() {
+      gameState.enemies.forEach(enemy => {
+        ctx.fillStyle = '#ef4444';
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        const healthPercent = enemy.health / enemy.maxHealth;
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(enemy.x - 20, enemy.y - 25, 40, 4);
+        ctx.fillStyle = healthPercent > 0.5 ? '#10b981' : healthPercent > 0.25 ? '#f59e0b' : '#ef4444';
+        ctx.fillRect(enemy.x - 20, enemy.y - 25, 40 * healthPercent, 4);
+      });
+    }
+    
+    function drawProjectiles() {
+      gameState.projectiles.forEach(proj => {
+        ctx.fillStyle = '#fbbf24';
+        ctx.shadowColor = '#fbbf24';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+    }
+    
+    function updateEnemies() {
+      gameState.enemies.forEach((enemy, index) => {
+        if (enemy.pathIndex >= enemyPath.length - 1) {
+          gameState.enemies.splice(index, 1);
+          gameState.lives--;
+          AudioManager.hit();
+          updateUI();
+          return;
+        }
+        
+        const target = enemyPath[enemy.pathIndex + 1];
+        const dx = target.x - enemy.x;
+        const dy = target.y - enemy.y;
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist < enemy.speed) {
+          enemy.pathIndex++;
+        } else {
+          enemy.x += (dx / dist) * enemy.speed;
+          enemy.y += (dy / dist) * enemy.speed;
+        }
+      });
+    }
+    
+    function updateTowers() {
+      const now = Date.now();
+      
+      gameState.towers.forEach(tower => {
+        const towerDef = towerTypes[tower.type];
+        
+        if (now - tower.lastFire < towerDef.fireRate) return;
+        
+        let target = null;
+        let closestDist = towerDef.range;
+        
+        gameState.enemies.forEach(enemy => {
+          const dist = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
+          if (dist < closestDist) {
+            closestDist = dist;
+            target = enemy;
+          }
+        });
+        
+        if (target) {
+          tower.lastFire = now;
+          AudioManager.shoot();
+          gameState.projectiles.push({
+            x: tower.x,
+            y: tower.y,
+            targetX: target.x,
+            targetY: target.y,
+            target: target,
+            damage: towerDef.damage,
+            speed: 5
+          });
+        }
+      });
+    }
+    
+    function updateProjectiles() {
+      gameState.projectiles.forEach((proj, index) => {
+        const dx = proj.targetX - proj.x;
+        const dy = proj.targetY - proj.y;
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist < proj.speed || !gameState.enemies.includes(proj.target)) {
+          if (gameState.enemies.includes(proj.target)) {
+            proj.target.health -= proj.damage;
+            AudioManager.hit();
+            
+            if (proj.target.health <= 0) {
+              const enemyIndex = gameState.enemies.indexOf(proj.target);
+              if (enemyIndex > -1) {
+                gameState.gold += proj.target.reward;
+                gameState.score += proj.target.reward * 2;
+                gameState.enemiesKilled++;
+                AudioManager.kill();
+                gameState.enemies.splice(enemyIndex, 1);
+                updateUI();
+              }
+            }
+          }
+          
+          gameState.projectiles.splice(index, 1);
+        } else {
+          proj.x += (dx / dist) * proj.speed;
+          proj.y += (dy / dist) * proj.speed;
+          proj.targetX = proj.target.x;
+          proj.targetY = proj.target.y;
+        }
+      });
+    }
+    
+    function endWave() {
+      gameState.waveActive = false;
+      document.getElementById('startWaveBtn').disabled = false;
+      
+      // Lock quiz button when wave ends
+      const quizBtn = document.getElementById('answerQuizBtn');
+      quizBtn.disabled = true;
+      quizBtn.innerHTML = '🔒 Start Wave untuk Unlock Quiz';
+      quizBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      
+      gameState.gold += 50;
+      gameState.score += 200;
+      gameState.wave++;
+      
+      AudioManager.wave();
+      updateUI();
+      
+      if (gameState.wave > 20) {
+        gameOver(true);
+      } else {
+        showNotification(`Wave ${gameState.wave - 1} Complete! +50 Gold`, 'success');
+      }
+    }
+    
+    function gameOver(victory) {
+      gameState.gameRunning = false;
+      if (gameState.animationId) {
+        cancelAnimationFrame(gameState.animationId);
+      }
+      
+      if (victory) {
+        AudioManager.win();
+      } else {
+        AudioManager.lose();
+      }
+      
+      document.getElementById('gameOverTitle').textContent = victory ? 'Victory!' : 'Game Over';
+      document.getElementById('gameOverTitle').className = victory ? 
+        'text-5xl font-bold mb-4 text-green-600' : 
+        'text-5xl font-bold mb-4 text-red-600';
+      document.getElementById('gameOverMessage').textContent = victory ?
+        `Congratulations! You defended your crystal through all 20 waves!` :
+        `You survived ${gameState.wave - 1} waves and answered ${gameState.questionsAnswered} questions!`;
+      document.getElementById('finalWave').textContent = gameState.wave - 1;
+      document.getElementById('finalGold').textContent = gameState.gold;
+      document.getElementById('finalKills').textContent = gameState.enemiesKilled;
+      
+      showScreen('gameOverScreen');
+    }
+    
+    function saveGame() {
+      const saveBtn = document.getElementById('saveGameBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      
+      const saveData = {
+        id: 's_' + Date.now(),
+        player_name: `Save ${new Date().toLocaleTimeString()}`,
+        current_wave: gameState.wave,
+        gold: gameState.gold,
+        lives: gameState.lives,
+        score: gameState.score,
+        towers_placed: JSON.stringify(gameState.towers),
+        enemies_killed: gameState.enemiesKilled,
+        timestamp: new Date().toISOString()
+      };
+      
+      StorageManager.saveGame(saveData);
+      loadData();
+      
+      showNotification('Game saved successfully!', 'success');
+      
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Simpan Game';
+    }
+    
+    function updateSavedGamesList() {
+      const container = document.getElementById('savedGames');
+      
+      if (allSavedGames.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-500 py-8">No saved games found</p>';
+        return;
+      }
+      
+      container.innerHTML = '';
+      allSavedGames.forEach(save => {
+        const saveCard = document.createElement('div');
+        saveCard.className = 'bg-purple-50 p-6 rounded-lg hover:bg-purple-100 transition';
+        saveCard.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="font-bold text-lg text-gray-800">${save.player_name || 'Unnamed Save'}</p>
+              <p class="text-sm text-gray-600">Wave ${save.current_wave} • ${save.gold} Gold • ${save.lives} Lives</p>
+              <p class="text-xs text-gray-500 mt-1">${new Date(save.timestamp).toLocaleString()}</p>
+            </div>
+            <div class="flex gap-2">
+              <button class="load-save-btn bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition" data-id="${save.id}">
+                Load
+              </button>
+              <button class="delete-save-btn bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition" data-id="${save.id}">
+                Delete
+              </button>
+            </div>
+          </div>
+        `;
+        container.appendChild(saveCard);
+      });
+      
+      document.querySelectorAll('.load-save-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          AudioManager.click();
+          loadSavedGame(btn.dataset.id);
+        });
+      });
+      
+      document.querySelectorAll('.delete-save-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          AudioManager.hit();
+          StorageManager.deleteSave(btn.dataset.id);
+          loadData();
+          updateSavedGamesList();
+          showNotification('Save deleted', 'success');
+        });
+      });
+    }
+    
+    function loadSavedGame(saveId) {
+      const save = allSavedGames.find(s => s.id === saveId);
+      if (!save) return;
+      
+      gameState.wave = save.current_wave;
+      gameState.gold = save.gold;
+      gameState.lives = save.lives;
+      gameState.score = save.score;
+      gameState.towers = JSON.parse(save.towers_placed);
+      gameState.enemiesKilled = save.enemies_killed;
+      gameState.enemies = [];
+      gameState.projectiles = [];
+      gameState.waveActive = false;
+      gameState.enemiesSpawned = 0;
+      gameState.gameRunning = true;
+      
+      showScreen('gameScreen');
+      updateUI();
+      
+      // Lock quiz button when loading saved game
+      const quizBtn = document.getElementById('answerQuizBtn');
+      quizBtn.disabled = true;
+      quizBtn.innerHTML = '🔒 Start Wave untuk Unlock Quiz';
+      quizBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      
+      gameLoop();
+      
+      showNotification('Game loaded successfully!', 'success');
+    }
+    
+    function showStats() {
+      const statsContent = document.getElementById('statsContent');
+      statsContent.innerHTML = `
+        <div class="col-span-2 text-center bg-purple-50 p-6 rounded-lg">
+          <p class="text-4xl font-bold text-purple-600 mb-2">Crystal Defenders Quiz</p>
+          <p class="text-gray-600">Learn and Defend!</p>
+        </div>
+        <div class="bg-blue-50 p-6 rounded-lg">
+          <p class="text-sm text-gray-600 mb-2">Total Questions</p>
+          <p class="text-3xl font-bold text-blue-600">${allQuestions.length}</p>
+        </div>
+        <div class="bg-green-50 p-6 rounded-lg">
+          <p class="text-sm text-gray-600 mb-2">Active Questions</p>
+          <p class="text-3xl font-bold text-green-600">${allQuestions.filter(q => q.is_active).length}</p>
+        </div>
+        <div class="bg-yellow-50 p-6 rounded-lg">
+          <p class="text-sm text-gray-600 mb-2">Saved Games</p>
+          <p class="text-3xl font-bold text-yellow-600">${allSavedGames.length}</p>
+        </div>
+        <div class="bg-red-50 p-6 rounded-lg">
+          <p class="text-sm text-gray-600 mb-2">Categories</p>
+          <p class="text-3xl font-bold text-red-600">${new Set(allQuestions.map(q => q.category)).size}</p>
+        </div>
+      `;
+      showScreen('statsScreen');
+    }
+    
+    function showLoadScreen() {
+      showScreen('loadScreen');
+      updateSavedGamesList();
+    }
+    
+    function exitGame() {
+      gameState.gameRunning = false;
+      if (gameState.animationId) {
+        cancelAnimationFrame(gameState.animationId);
+      }
+      showMainMenu();
+    }
+    
+    function showMainMenu() {
+      showScreen('mainMenu');
+    }
+    
+    function showScreen(screenId) {
+      ['mainMenu', 'adminPanel', 'gameScreen', 'statsScreen', 'loadScreen', 'gameOverScreen'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(screenId).classList.remove('hidden');
+    }
+    
+    function updateUI() {
+      document.getElementById('waveDisplay').textContent = `${gameState.wave}/20`;
+      document.getElementById('goldDisplay').textContent = gameState.gold;
+      document.getElementById('livesDisplay').textContent = gameState.lives;
+      document.getElementById('scoreDisplay').textContent = gameState.score;
+      
+      document.querySelectorAll('.tower-btn').forEach(btn => {
+        const towerType = btn.dataset.towerType;
+        const tower = towerTypes[towerType];
+        btn.disabled = gameState.gold < tower.cost;
+      });
+    }
+    
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(400px)';
+        setTimeout(() => notification.remove(), 300);
+      }, 3000);
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9abd8570a7454068',t:'MTc2NTM3Nzg3Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
